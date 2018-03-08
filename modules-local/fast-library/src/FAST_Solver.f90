@@ -47,6 +47,7 @@ MODULE FAST_Solver
    USE ServoDyn
    USE SubDyn
    USE OpenFOAM
+   USE SuperController
    Use ExtPtfm_MCKF
    
 
@@ -62,7 +63,7 @@ SUBROUTINE BD_InputSolve( p_FAST, BD, y_AD, u_AD, MeshMapData, ErrStat, ErrMsg )
    TYPE(FAST_ParameterType),       INTENT(IN   )  :: p_FAST                   !< Glue-code simulation parameters
    TYPE(BeamDyn_Data),             INTENT(INOUT)  :: BD                       !< BD Inputs at t
    TYPE(AD_OutputType),            INTENT(IN   )  :: y_AD                     !< AeroDyn outputs
-   TYPE(AD_InputType),             INTENT(INOUT)  :: u_AD                     !< AD inputs (for AD-BD load transfer)
+   TYPE(AD_InputType),             INTENT(IN   )  :: u_AD                     !< AD inputs (for AD-BD load transfer)
    
    TYPE(FAST_ModuleMapType),       INTENT(INOUT)  :: MeshMapData              !< Data for mapping between modules
    INTEGER(IntKi),                 INTENT(  OUT)  :: ErrStat                  !< Error status
@@ -122,7 +123,7 @@ SUBROUTINE ED_InputSolve( p_FAST, u_ED, y_ED, p_AD14, y_AD14, y_AD, y_SrvD, u_AD
    TYPE(AD14_ParameterType),       INTENT(IN   )  :: p_AD14                   !< AeroDyn14 parameters (a hack because the AD14 meshes aren't set up properly)
    TYPE(AD14_OutputType),          INTENT(IN   )  :: y_AD14                   !< AeroDyn14 outputs
    TYPE(AD_OutputType),            INTENT(IN   )  :: y_AD                     !< AeroDyn outputs
-   TYPE(AD_InputType),             INTENT(INOUT)  :: u_AD                     !< AD inputs (for AD-ED load transfer)
+   TYPE(AD_InputType),             INTENT(IN   )  :: u_AD                     !< AD inputs (for AD-ED load transfer)
    TYPE(SrvD_OutputType),          INTENT(IN   )  :: y_SrvD                   !< ServoDyn outputs
    TYPE(SrvD_InputType),           INTENT(IN   )  :: u_SrvD                   !< ServoDyn inputs
    
@@ -3657,7 +3658,6 @@ SUBROUTINE ResetRemapFlags(p_FAST, ED, BD, AD14, AD, HD, SD, ExtPtfm, SrvD, MAPp
          BD%Input(1,i)%HubMotion%RemapFlag  = .FALSE.
              
          BD%y(i)%ReactionForce%RemapFlag    = .FALSE.
-         BD%y(i)%BldForce%RemapFlag         = .FALSE.
          BD%y(i)%BldMotion%RemapFlag        = .FALSE.
       END DO                  
    END IF
@@ -4471,7 +4471,7 @@ end if
    
    
    IF ( p_FAST%CompServo == Module_SrvD  ) THEN         
-      CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%Input(1), ED%Output(1), IfW%y, OpFM%y, BD%y, MeshmapData, ErrStat2, ErrMsg2 )    ! At initialization, we don't have a previous value, so we'll use the guess inputs instead. note that this violates the framework.... (done for the Bladed DLL)
+      CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%Input(1), ED%Output(1), IfW%y, OpFM%y, BD%y, MeshmapData, ErrStat2, ErrMsg2, SrvD%y )    ! At initialization, we don't have a previous value, so we'll use the guess inputs instead. note that this violates the framework.... (done for the Bladed DLL)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )  
    END IF         
              
@@ -4790,7 +4790,7 @@ SUBROUTINE SolveOption2(this_time, this_state, p_FAST, m_FAST, ED, BD, AD14, AD,
       IF ( firstCall ) THEN
          CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%Input(1), ED%Output(1), IfW%y, OpFM%y, BD%y, MeshMapData, ErrStat2, ErrMsg2 )    ! At initialization, we don't have a previous value, so we'll use the guess inputs instead. note that this violates the framework.... (done for the Bladed DLL)
       ELSE
-         CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%Input(1), ED%Output(1), IfW%y, OpFM%y, BD%y, MeshMapData, ErrStat2, ErrMsg2, SrvD%y_prev   ) 
+         CALL SrvD_InputSolve( p_FAST, m_FAST, SrvD%Input(1), ED%Output(1), IfW%y, OpFM%y, BD%y, MeshMapData, ErrStat2, ErrMsg2, SrvD%y ) ! note that this uses the outputs from the previous step, violating the framework for the Bladed DLL (if SrvD%y is used in another way, this will need to be changed)
       END IF
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
